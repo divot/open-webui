@@ -85,7 +85,7 @@ class MCPClient:
                 await self.disconnect()
                 raise e
 
-    async def list_tool_specs(self) -> Optional[dict]:
+    async def list_tool_specs(self, strict: bool | None = None) -> Optional[dict]:
         if not self.session:
             raise RuntimeError('MCP client is not connected.')
 
@@ -102,7 +102,11 @@ class MCPClient:
             # TODO: handle outputSchema if needed
             outputSchema = getattr(tool, 'outputSchema', None)
 
-            tool_specs.append({'name': name, 'description': description, 'parameters': inputSchema})
+            tool_spec = {'name': name, 'description': description, 'parameters': inputSchema}
+            if isinstance(strict, bool):
+                tool_spec['strict'] = strict
+
+            tool_specs.append(tool_spec)
 
         return tool_specs
 
