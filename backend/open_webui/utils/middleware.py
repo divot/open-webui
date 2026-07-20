@@ -2153,7 +2153,8 @@ async def connect_mcp_server(
     if isinstance(function_name_filter_list, str):
         function_name_filter_list = function_name_filter_list.split(',')
 
-    tool_specs = await client.list_tool_specs()
+    strict = mcp_server_connection.get('config', {}).get('strict')
+    tool_specs = await client.list_tool_specs(strict=strict)
     if function_name_filter_list:
         tool_specs = [spec for spec in tool_specs if is_string_allowed(spec['name'], function_name_filter_list)]
 
