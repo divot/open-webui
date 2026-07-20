@@ -53,6 +53,7 @@
 	let headers = '';
 
 	let functionNameFilterList = '';
+	let toolStrictMode: '' | 'false' | 'true' = '';
 	let accessGrants = [];
 
 	let id = '';
@@ -211,6 +212,7 @@
 				key,
 				config: {
 					enable: enable,
+					...(type === 'mcp' && toolStrictMode !== '' ? { strict: toolStrictMode === 'true' } : {}),
 					access_grants: accessGrants
 				},
 				info: {
@@ -277,6 +279,8 @@
 
 				if (data.config) {
 					enable = data.config.enable ?? true;
+					toolStrictMode =
+						data.config.strict === true ? 'true' : data.config.strict === false ? 'false' : '';
 					accessGrants = data.config.access_grants ?? [];
 				}
 
@@ -386,6 +390,7 @@
 			config: {
 				enable: enable,
 				function_name_filter_list: functionNameFilterList,
+				...(type === 'mcp' && toolStrictMode !== '' ? { strict: toolStrictMode === 'true' } : {}),
 				access_grants: accessGrants
 			},
 			info: {
@@ -438,6 +443,7 @@
 
 		enable = true;
 		functionNameFilterList = '';
+		toolStrictMode = '';
 		accessGrants = [];
 	};
 
@@ -467,6 +473,12 @@
 
 			enable = connection.config?.enable ?? true;
 			functionNameFilterList = connection.config?.function_name_filter_list ?? '';
+			toolStrictMode =
+				connection.config?.strict === true
+					? 'true'
+					: connection.config?.strict === false
+						? 'false'
+						: '';
 			accessGrants = connection.config?.access_grants ?? [];
 		}
 	};
@@ -848,6 +860,26 @@
 						</div>
 
 						{#if showAdvanced}
+							{#if type === 'mcp' && !direct}
+								<div class="flex flex-row justify-between items-center w-full mt-2">
+									<label for="tool-strict-mode-toggle" class="mb-0.5 text-xs text-gray-500"
+										>{$i18n.t('Tool Strict Mode')}</label
+									>
+
+									<button
+										on:click={() => {
+											toolStrictMode =
+												toolStrictMode === '' ? 'false' : toolStrictMode === 'false' ? 'true' : '';
+										}}
+										type="button"
+										id="tool-strict-mode-toggle"
+										class="text-xs text-gray-700 dark:text-gray-300"
+									>
+										{toolStrictMode === '' ? $i18n.t('Default') : toolStrictMode}
+									</button>
+								</div>
+							{/if}
+
 							{#if ['', 'openapi'].includes(type)}
 								<div class="flex gap-2 mt-2">
 									<div class="flex flex-col w-full">
