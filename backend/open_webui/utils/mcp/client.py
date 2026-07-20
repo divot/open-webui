@@ -178,7 +178,7 @@ class MCPClient:
             if not connected.done():
                 connected.set_exception(RuntimeError('MCP client failed to connect.'))
 
-    async def list_tool_specs(self) -> list[dict]:
+    async def list_tool_specs(self, strict: bool | None = None) -> list[dict]:
         if not self.client:
             raise RuntimeError('MCP client is not connected.')
 
@@ -205,7 +205,11 @@ class MCPClient:
 
             # TODO: handle output_schema if needed
 
-            tool_specs.append({'name': name, 'description': description, 'parameters': input_schema})
+            tool_spec = {'name': name, 'description': description, 'parameters': input_schema}
+            if isinstance(strict, bool):
+                tool_spec['strict'] = strict
+
+            tool_specs.append(tool_spec)
 
         return tool_specs
 
