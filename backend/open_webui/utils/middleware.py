@@ -121,6 +121,7 @@ from open_webui.utils.misc import (
 )
 from open_webui.utils.payload import apply_system_prompt_to_body, resolve_system_prompt
 from open_webui.utils.plugin import load_function_module_by_id
+from open_webui.utils.request_features import should_force_web_search
 from open_webui.utils.response import merge_usage, normalize_usage
 from open_webui.utils.sanitize import sanitize_code
 from open_webui.utils.task import (
@@ -2550,8 +2551,11 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                 'features.web_search',
                 await Config.get('user.permissions'),
             ):
-                # Skip forced RAG web search when native FC is enabled - model can use web_search tool
-                if metadata.get('params', {}).get('function_calling') == 'legacy':
+                # Browser sessions can use the native web_search tool. Direct API
+                # callers have no session/WebSocket context, so builtin tools are
+                # intentionally not injected for them below. Honor their explicit
+                # feature request through the synchronous RAG search path instead.
+                if should_force_web_search(metadata):
                     form_data = await chat_web_search_handler(request, form_data, extra_params, user)
 
         if 'image_generation' in features and features['image_generation']:
