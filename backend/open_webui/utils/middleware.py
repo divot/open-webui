@@ -6278,6 +6278,11 @@ async def streaming_chat_response_handler(response, ctx):
                 }
                 await outlet_filter_handler(ctx)
                 await background_tasks_handler(ctx)
+                # Direct API callers with a chat/message context have no
+                # WebSocket consumer. Return the same authoritative final
+                # payload that was emitted and persisted instead of allowing
+                # FastAPI to serialize the implicit None result as JSON null.
+                return data
             except asyncio.CancelledError:
                 log.warning('Task was cancelled!')
 
