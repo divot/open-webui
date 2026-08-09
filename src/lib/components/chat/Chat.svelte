@@ -4240,16 +4240,13 @@
 />
 
 <div
-	class="{embedded
-		? 'h-full'
-		: 'h-screen max-h-[100dvh]'} transition-width duration-200 ease-in-out {$showSidebar &&
-	!embedded
+	class="h-full min-h-0 transition-width duration-200 ease-in-out {$showSidebar && !embedded
 		? '  md:max-w-[calc(100%-var(--sidebar-width))]'
 		: ' '} w-full max-w-full min-w-0 flex flex-col"
 	id={chatContainerId}
 >
 	{#if !loading}
-		<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
+		<div in:fade={{ duration: 50 }} class="w-full h-full min-h-0 flex flex-col">
 			{#if !embedded && $selectedFolder && $selectedFolder?.meta?.background_image_url}
 				<div
 					class="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat"
@@ -4271,8 +4268,8 @@
 				/>
 			{/if}
 
-			<div class="w-full h-full flex">
-				<div class="h-full flex relative max-w-full min-w-0 flex-1 flex-col">
+			<div class="w-full h-full min-h-0 flex">
+				<div class="h-full min-h-0 flex relative max-w-full min-w-0 flex-1 flex-col">
 					<FilesOverlay show={dragged} />
 					{#if embedded}
 						<div
@@ -4364,7 +4361,12 @@
 							}}
 						/>
 					{/if}
-					<div id="chat-pane" class="flex flex-col flex-auto z-10 w-full @container overflow-auto">
+					<div
+						id="chat-pane"
+						class="flex min-h-0 flex-col flex-auto z-10 w-full @container {embedded
+							? 'overflow-auto'
+							: 'overflow-hidden md:overflow-auto'}"
+					>
 						{#if ($settings?.landingPageMode === 'chat' && !$selectedFolder) || createMessagesList(history, history.currentId).length > 0}
 							<div
 								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto h-0 max-w-full z-10 scrollbar-hidden"
