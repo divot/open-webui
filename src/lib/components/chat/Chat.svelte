@@ -6057,10 +6057,7 @@
 {/if}
 
 <div
-	class="{embedded
-		? 'h-full'
-		: 'h-screen max-h-[100dvh]'} transition-width duration-200 ease-in-out {$showSidebar &&
-	!embedded
+	class="h-full min-h-0 transition-width duration-200 ease-in-out {$showSidebar && !embedded
 		? '  md:max-w-[calc(100%-var(--sidebar-width))]'
 		: ' '} w-full max-w-full min-w-0 flex flex-col"
 	id={chatContainerId}
@@ -6070,7 +6067,7 @@
 	on:drop|capture={(event) => tabs?.handleChatDrop(event)}
 	on:dragleave={(event) => tabs?.handleChatDragLeave(event)}
 >
-	<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
+	<div in:fade={{ duration: 50 }} class="w-full h-full min-h-0 flex flex-col">
 		{#if backgroundImage}
 			<div
 				class="pointer-events-none absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat"
@@ -6203,7 +6200,9 @@
 					{/if}
 					<div
 						id="chat-pane"
-						class="flex min-h-0 flex-col flex-auto z-10 w-full @container overflow-auto"
+						class="flex min-h-0 flex-col flex-auto z-10 w-full @container {embedded
+							? 'overflow-auto'
+							: 'overflow-hidden md:overflow-auto'}"
 					>
 						<div class="sr-only" aria-live="polite" aria-atomic="true">{liveStatus}</div>
 						{#if (!tabbed && $settings?.landingPageMode === 'chat' && !$selectedFolder) || (!contextOnly && createMessagesList(history, history.currentId).length > 0)}
