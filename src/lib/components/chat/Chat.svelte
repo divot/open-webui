@@ -6209,7 +6209,9 @@
 						<div class="sr-only" aria-live="polite" aria-atomic="true">{liveStatus}</div>
 						{#if (!tabbed && $settings?.landingPageMode === 'chat' && !$selectedFolder) || (!contextOnly && createMessagesList(history, history.currentId).length > 0)}
 							<div
-								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto overscroll-y-contain md:overscroll-y-auto h-0 max-w-full z-10 scrollbar-hidden"
+								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto {embedded
+									? ''
+									: 'overscroll-y-contain md:overscroll-y-auto'} h-0 max-w-full z-10 scrollbar-hidden"
 								id={messagesContainerId}
 								data-visual-viewport-scroll={embedded ? undefined : ''}
 								bind:this={messagesContainerElement}
