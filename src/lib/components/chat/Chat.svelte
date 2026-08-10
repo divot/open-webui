@@ -14,6 +14,7 @@
 
 	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	import { fade } from 'svelte/transition';
+	import { preventVisualViewportScroll } from '$lib/actions/visualViewport';
 	const i18n: Writable<i18nType> = getContext('i18n');
 	const appLayout = getContext<AppLayoutContext | undefined>('appLayout');
 
@@ -6057,6 +6058,7 @@
 {/if}
 
 <div
+	use:preventVisualViewportScroll={!embedded && $mobile}
 	class="h-full min-h-0 transition-width duration-200 ease-in-out {$showSidebar && !embedded
 		? '  md:max-w-[calc(100%-var(--sidebar-width))]'
 		: ' '} w-full max-w-full min-w-0 flex flex-col"
@@ -6207,8 +6209,9 @@
 						<div class="sr-only" aria-live="polite" aria-atomic="true">{liveStatus}</div>
 						{#if (!tabbed && $settings?.landingPageMode === 'chat' && !$selectedFolder) || (!contextOnly && createMessagesList(history, history.currentId).length > 0)}
 							<div
-								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto h-0 max-w-full z-10 scrollbar-hidden"
+								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto overscroll-y-contain md:overscroll-y-auto h-0 max-w-full z-10 scrollbar-hidden"
 								id={messagesContainerId}
+								data-visual-viewport-scroll={embedded ? undefined : ''}
 								bind:this={messagesContainerElement}
 								on:scroll={(e) => {
 									if (!messagesContainerElement) return;
