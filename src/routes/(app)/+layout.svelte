@@ -471,7 +471,7 @@
 {#if $user}
 	<div class="app relative">
 		<div
-			use:visualViewport
+			use:visualViewport={$mobile}
 			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 h-screen max-h-[100dvh] overflow-hidden md:overflow-auto flex flex-row justify-end"
 			style:height={$mobile ? 'var(--visual-viewport-height, 100dvh)' : undefined}
 			style:transform={$mobile ? 'translateY(var(--visual-viewport-offset-top, 0px))' : undefined}

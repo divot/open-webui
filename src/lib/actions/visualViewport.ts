@@ -1,15 +1,42 @@
 import type { Action } from 'svelte/action';
 
-export const visualViewport: Action<HTMLElement> = (node) => {
+export const visualViewport: Action<HTMLElement, boolean> = (node, preserveBottom) => {
 	const viewport = window.visualViewport;
+	let previousHeight = viewport?.height;
+	let scrollFrame: number | undefined;
 
 	const update = () => {
 		if (!viewport) {
 			return;
 		}
 
+		// Check before resizing the shell so the old viewport position is still measurable.
+		const pinnedScrollers =
+			preserveBottom &&
+			viewport.scale === 1 &&
+			previousHeight !== undefined &&
+			viewport.height < previousHeight
+				? [...node.querySelectorAll<HTMLElement>('[data-visual-viewport-scroll]')].filter(
+						(element) => element.scrollHeight - element.scrollTop <= element.clientHeight + 5
+					)
+				: [];
+
 		node.style.setProperty('--visual-viewport-height', `${viewport.height}px`);
 		node.style.setProperty('--visual-viewport-offset-top', `${viewport.offsetTop}px`);
+		previousHeight = viewport.height;
+
+		if (pinnedScrollers.length > 0) {
+			if (scrollFrame !== undefined) {
+				cancelAnimationFrame(scrollFrame);
+			}
+
+			scrollFrame = requestAnimationFrame(() => {
+				for (const element of pinnedScrollers) {
+					element.scrollTop = element.scrollHeight;
+				}
+				scrollFrame = undefined;
+			});
+		}
 	};
 
 	update();
@@ -18,10 +45,16 @@ export const visualViewport: Action<HTMLElement> = (node) => {
 	window.addEventListener('resize', update);
 
 	return {
+		update(value) {
+			preserveBottom = value;
+		},
 		destroy() {
 			viewport?.removeEventListener('resize', update);
 			viewport?.removeEventListener('scroll', update);
 			window.removeEventListener('resize', update);
+			if (scrollFrame !== undefined) {
+				cancelAnimationFrame(scrollFrame);
+			}
 			node.style.removeProperty('--visual-viewport-height');
 			node.style.removeProperty('--visual-viewport-offset-top');
 		}

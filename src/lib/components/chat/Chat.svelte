@@ -4371,9 +4371,11 @@
 					>
 						{#if ($settings?.landingPageMode === 'chat' && !$selectedFolder) || createMessagesList(history, history.currentId).length > 0}
 							<div
-								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto overscroll-y-contain md:overscroll-y-auto h-0 max-w-full z-10 scrollbar-hidden"
+								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto {embedded
+									? ''
+									: 'overscroll-y-contain md:overscroll-y-auto'} h-0 max-w-full z-10 scrollbar-hidden"
 								id="messages-container"
-								data-visual-viewport-scroll
+								data-visual-viewport-scroll={embedded ? undefined : ''}
 								bind:this={messagesContainerElement}
 								on:scroll={(e) => {
 									autoScroll =
