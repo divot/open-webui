@@ -27,3 +27,38 @@ export const visualViewport: Action<HTMLElement> = (node) => {
 		}
 	};
 };
+
+export const preventVisualViewportScroll: Action<HTMLElement, boolean> = (node, enabled) => {
+	const viewport = window.visualViewport;
+	let isEnabled = enabled;
+
+	const preventOuterScroll = (event: TouchEvent) => {
+		const target = event.target;
+		const layoutViewportHeight = document.documentElement.clientHeight;
+
+		if (
+			!isEnabled ||
+			!viewport ||
+			viewport.scale !== 1 ||
+			Math.round(viewport.height) >= Math.round(layoutViewportHeight) ||
+			!(target instanceof Element) ||
+			target.closest('[data-visual-viewport-scroll]')
+		) {
+			return;
+		}
+
+		event.preventDefault();
+		event.stopImmediatePropagation();
+	};
+
+	node.addEventListener('touchmove', preventOuterScroll, { capture: true, passive: false });
+
+	return {
+		update(value) {
+			isEnabled = value;
+		},
+		destroy() {
+			node.removeEventListener('touchmove', preventOuterScroll, { capture: true });
+		}
+	};
+};
