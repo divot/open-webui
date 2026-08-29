@@ -1347,10 +1347,15 @@ async def chat_completion(
                 raise HTTPException(status_code=404, detail='Temporary chat expired or unavailable')
 
         initial_title_generation = None
+        initial_title_ctx = None
+        initial_chat_request_queued = None
         if is_new_chat and tasks and TASKS.TITLE_GENERATION in tasks:
             initial_title_generation = tasks.pop(TASKS.TITLE_GENERATION)
         elif is_new_chat and agent_model:
             initial_title_generation = False  # Still give agent chats a first-message title.
+
+        if initial_title_generation is not None:
+            initial_chat_request_queued = asyncio.get_running_loop().create_future()
 
         if metadata.get('chat_id') and user:
             chat_id = metadata['chat_id']
@@ -1528,7 +1533,7 @@ async def chat_completion(
                             'message_id': all_assistant_ids[0],
                         }
                         event_emitter = await get_event_emitter(title_metadata, update_db=False)
-                        title_ctx = {
+                        initial_title_ctx = {
                             'request': request,
                             'form_data': form_data,
                             'user': user,
@@ -1536,14 +1541,6 @@ async def chat_completion(
                             'tasks': {TASKS.TITLE_GENERATION: initial_title_generation},
                             'event_emitter': event_emitter,
                         }
-
-                        async def run_initial_title_generation():
-                            try:
-                                await background_tasks_handler(title_ctx)
-                            except Exception:
-                                log.exception('Error generating initial chat title')
-
-                        asyncio.create_task(run_initial_title_generation())
                 else:
                     chat = await Chats.get_accessible_chat_by_id(chat_id, user, permission='write', chat=existing_chat)
                     if not chat:
@@ -1639,7 +1636,30 @@ async def chat_completion(
             detail=str(e),
         )
 
-    async def process_chat(request, form_data, user, metadata, model, tasks=None):
+    def schedule_initial_title_generation():
+        if initial_title_ctx is None or initial_chat_request_queued is None:
+            return
+
+        async def run_initial_title_generation():
+            try:
+                # Creating the conversation task first is not enough: its payload
+                # preprocessing can yield while the title request races ahead.
+                if await initial_chat_request_queued:
+                    await background_tasks_handler(initial_title_ctx)
+            except Exception as e:
+                log.debug('Error generating initial chat title: %s', e)
+
+        asyncio.create_task(run_initial_title_generation())
+
+    async def process_chat(
+        request,
+        form_data,
+        user,
+        metadata,
+        model,
+        tasks=None,
+        chat_request_queued=None,
+    ):
         error_detail = None
         try:
             try:
@@ -1674,6 +1694,8 @@ async def chat_completion(
                     from open_webui.utils.agents.runner import run as run_agent
 
                     response = await run_agent(request, form_data, user, metadata, model)
+                    if chat_request_queued is not None and not chat_request_queued.done():
+                        chat_request_queued.set_result(True)
                     if tasks and TASKS.TITLE_GENERATION in tasks:
                         title_tasks = {TASKS.TITLE_GENERATION: tasks[TASKS.TITLE_GENERATION]}
                         ctx = await build_chat_response_context(
@@ -1694,6 +1716,8 @@ async def chat_completion(
                     return {'status': True, 'chat_id': metadata.get('chat_id'), 'paused': True}
 
                 response = await chat_completion_handler(request, form_data, user)
+                if chat_request_queued is not None and not chat_request_queued.done():
+                    chat_request_queued.set_result(True)
 
                 if isinstance(response, Response) and response.status_code >= 400:
                     error_detail = get_response_error_detail(response)
@@ -1769,6 +1793,9 @@ async def chat_completion(
                         except Exception:
                             log.exception('Failed to publish chat failed event')
         finally:
+            if chat_request_queued is not None and not chat_request_queued.done():
+                chat_request_queued.set_result(False)
+
             # Clean up MCP clients.  Each client is isolated so one
             # failure doesn't skip the rest.
             #
@@ -1831,6 +1858,7 @@ async def chat_completion(
         subagent_results = []
         is_internal = getattr(request.state, 'internal', False) is True
         chat_id = metadata['chat_id']
+        initial_title_gate_assigned = False
 
         for idx, entry in enumerate(message_ids):
             target_model_id = entry['model_id']
@@ -1874,6 +1902,11 @@ async def chat_completion(
 
             # Only the first model runs chat-level background tasks;
             # subsequent models only run follow-ups.
+            chat_request_queued = None
+            if not initial_title_gate_assigned:
+                chat_request_queued = initial_chat_request_queued
+                initial_title_gate_assigned = chat_request_queued is not None
+
             process = process_chat(
                 request,
                 model_form_data,
@@ -1886,6 +1919,7 @@ async def chat_completion(
                     k: v for k, v in (tasks or {}).items() if k not in (TASKS.TITLE_GENERATION, TASKS.TAGS_GENERATION)
                 }
                 or None,
+                chat_request_queued,
             )
             if is_internal:
                 subagent_results.append(await process)
@@ -1897,9 +1931,17 @@ async def chat_completion(
                 id=chat_id,
                 task_id=per_model_metadata['task_id'],
             )
+            if chat_request_queued is not None:
+
+                def resolve_unqueued_request(_task, gate=chat_request_queued):
+                    if not gate.done():
+                        gate.set_result(False)
+
+                task.add_done_callback(resolve_unqueued_request)
             chat_tasks[task_id] = task
 
         if is_internal:
+            schedule_initial_title_generation()
             return {
                 'status': True,
                 'task_ids': [],
@@ -1917,6 +1959,8 @@ async def chat_completion(
                 folder_id = metadata.get('folder_id') or await Chats.get_chat_folder_id(chat_id, user.id)
                 await event_emitter({'type': 'chat:active', 'data': {'active': True, 'folder_id': folder_id}})
 
+        schedule_initial_title_generation()
+
         # Automation chat runs must finish before their caller records success.
         if metadata.get('automation_id') and is_saved_chat_id(chat_id):
             await asyncio.gather(*chat_tasks.values())
@@ -1929,8 +1973,17 @@ async def chat_completion(
     else:
         # Legacy/direct: single model, synchronous
         metadata['message_id'] = message_ids[0]['message_id']
+        schedule_initial_title_generation()
         try:
-            return await process_chat(request, form_data, user, metadata, model, tasks)
+            return await process_chat(
+                request,
+                form_data,
+                user,
+                metadata,
+                model,
+                tasks,
+                initial_chat_request_queued,
+            )
         except HTTPException:
             raise
         except Exception as e:
