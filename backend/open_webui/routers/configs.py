@@ -621,7 +621,8 @@ async def verify_tool_servers_config(request: Request, form_data: ToolServerConn
                         headers.update(custom_headers)
 
                     await client.connect(form_data.url, headers=headers)
-                    specs = await client.list_tool_specs()
+                    strict = (form_data.config or {}).get('strict')
+                    specs = await client.list_tool_specs(strict=strict)
                     return {
                         'status': True,
                         'specs': specs,
