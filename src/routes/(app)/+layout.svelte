@@ -14,6 +14,7 @@
 	import { getBanners } from '$lib/apis/configs';
 	import { getTerminalServers } from '$lib/apis/terminal';
 	import { getUserSettings } from '$lib/apis/users';
+	import { visualViewport } from '$lib/actions/visualViewport';
 	import { setAppFontFamily, setTextScale } from '$lib/utils/text-scale';
 
 	import { WEBUI_VERSION, WEBUI_API_BASE_URL } from '$lib/constants';
@@ -470,7 +471,10 @@
 {#if $user}
 	<div class="app relative">
 		<div
-			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 h-screen max-h-[100dvh] overflow-auto flex flex-row justify-end"
+			use:visualViewport={$mobile}
+			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 h-screen max-h-[100dvh] overflow-hidden md:overflow-auto flex flex-row justify-end"
+			style:height={$mobile ? 'var(--visual-viewport-height, 100dvh)' : undefined}
+			style:transform={$mobile ? 'translateY(var(--visual-viewport-offset-top, 0px))' : undefined}
 		>
 			{#if !['user', 'admin'].includes($user?.role)}
 				<AccountPending />
