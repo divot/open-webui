@@ -7,16 +7,21 @@ from open_webui.utils.mcp.client import MCPClient
 
 def make_client_with_tool(input_schema: dict) -> MCPClient:
     client = MCPClient()
-    client.session = AsyncMock()
-    client.session.list_tools.return_value = SimpleNamespace(
+    client.client = AsyncMock()
+    client.client.list_tools.return_value = SimpleNamespace(
         tools=[
             SimpleNamespace(
                 name='HassTurnOff',
                 description='Turns off a device or entity.',
-                inputSchema=input_schema,
-                outputSchema=None,
+                input_schema=input_schema,
+                model_dump=lambda **_kwargs: {
+                    'name': 'HassTurnOff',
+                    'description': 'Turns off a device or entity.',
+                    'inputSchema': input_schema,
+                },
             )
-        ]
+        ],
+        next_cursor=None,
     )
     return client
 
@@ -72,16 +77,19 @@ def test_list_tool_specs_ignores_non_boolean_strict_values():
 def test_call_tool_forwards_arguments_unchanged():
     async def run_test():
         client = MCPClient()
-        client.session = AsyncMock()
-        client.session.call_tool.return_value = SimpleNamespace(
-            isError=False,
-            model_dump=lambda mode: {'content': [{'type': 'text', 'text': 'ok'}]},
+        client.client = AsyncMock()
+        client.client.call_tool.return_value = SimpleNamespace(
+            model_dump=lambda **_kwargs: {'content': [{'type': 'text', 'text': 'ok'}]},
         )
         arguments = {'name': 'Main'}
 
         result = await client.call_tool('HassTurnOff', arguments)
 
-        client.session.call_tool.assert_awaited_once_with('HassTurnOff', arguments)
+        client.client.call_tool.assert_awaited_once_with(
+            'HassTurnOff',
+            arguments,
+            read_timeout_seconds=float('inf'),
+        )
         assert result == [{'type': 'text', 'text': 'ok'}]
 
     asyncio.run(run_test())
