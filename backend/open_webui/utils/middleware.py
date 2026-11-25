@@ -139,6 +139,11 @@ from open_webui.utils.misc import (
 from open_webui.utils.oauth import get_system_oauth_token
 from open_webui.utils.payload import apply_params_to_form_data, apply_system_prompt_to_body
 from open_webui.utils.plugin import load_function_module_by_id
+from open_webui.utils.request_features import (
+    restrict_builtin_tools,
+    should_force_web_search,
+    should_use_builtin_tools,
+)
 from open_webui.utils.response import (
     convert_responses_stream_to_chat_completions,
     get_response_delta_key,
@@ -2084,7 +2089,7 @@ async def process_chat_payload(request, form_data, user, metadata, model):
     chat = await Chats.get_chat_by_id(chat_id) if is_saved_chat_id(chat_id) else None
     is_note_chat = bool(chat and (chat.meta or {}).get('internal') is True and (chat.meta or {}).get('type') == 'note')
     use_builtin_tools = is_note_chat or (
-        bool(metadata.get('session_id'))
+        should_use_builtin_tools(metadata)
         and metadata.get('params', {}).get('function_calling') != 'legacy'
         and (model.get('info', {}).get('meta', {}).get('capabilities') or {}).get('builtin_tools', True)
     )
@@ -2400,8 +2405,10 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                 'features.web_search',
                 await Config.get('user.permissions'),
             ):
-                # Skip forced RAG web search when native FC is enabled - model can use web_search tool
-                if metadata.get('params', {}).get('function_calling') == 'legacy':
+                # Browser sessions and explicit sessionless native requests use
+                # the model-callable web search tools. Other direct API callers
+                # retain the synchronous RAG fallback for compatibility.
+                if should_force_web_search(metadata):
                     form_data = await chat_web_search_handler(request, form_data, extra_params, user)
 
         if 'image_generation' in features and features['image_generation']:
@@ -2804,8 +2811,9 @@ async def process_chat_payload(request, form_data, user, metadata, model):
             metadata['mcp_clients'] = mcp_clients
 
         # Inject builtin tools for native function calling based on enabled features and model capability.
-        # Only inject when the request originates from the UI (identified by session_id).
-        # API callers don't expect hidden tools; they can explicitly request tools via tool_ids.
+        # Browser requests receive their enabled builtins. Explicit sessionless
+        # native-search requests receive only search_web/fetch_url so an API
+        # caller cannot accidentally opt into unrelated hidden builtins.
         if use_builtin_tools:
             if model_builtin_tools.get('knowledge', True):
                 from html import escape
@@ -2840,6 +2848,7 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                 model,
                 is_note_chat=is_note_chat,
             )
+            builtin_tools = restrict_builtin_tools(metadata, builtin_tools)
             for name, tool_dict in builtin_tools.items():
                 if name not in tools_dict:
                     tools_dict[name] = tool_dict
@@ -6554,6 +6563,11 @@ async def streaming_chat_response_handler(response, ctx):
                 }
                 await outlet_filter_handler(ctx)
                 await background_tasks_handler(ctx)
+                # Direct API callers with a chat/message context have no
+                # WebSocket consumer. Return the same authoritative final
+                # payload that was emitted and persisted instead of allowing
+                # FastAPI to serialize the implicit None result as JSON null.
+                return data
             except asyncio.CancelledError:
                 log.warning('Task was cancelled!')
 
