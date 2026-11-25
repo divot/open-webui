@@ -24,6 +24,16 @@ html {
 	font-size: calc(1rem * var(--app-text-scale, 1));
 }
 
+/* The mobile app shell owns vertical scrolling. Keep the layout viewport from
+   becoming a second scroll container while the on-screen keyboard is visible. */
+html.visual-viewport-locked,
+body.visual-viewport-locked {
+	height: 100%;
+	overflow: hidden;
+	overflow: clip;
+	overscroll-behavior: none;
+}
+
 #sidebar-chat-item {
 	font-size: 0.8125rem;
 	/* sidebar item sizing scales for the chat list entries */
